@@ -7,9 +7,7 @@ program!(0xFFFFFFFE, "GPL");
 #[xdp]
 fn clean_dns(ctx: XdpContext) -> XdpResult {
     let ip = ctx.ip()?;
-    // only match udp 8.8.8.8
     if unsafe { (*ip).protocol as u32 } != IPPROTO_UDP
-        || unsafe { (*ip).saddr as u32 } != 0x08080808
     {
         return Ok(XdpAction::Pass);
     }
@@ -19,30 +17,32 @@ fn clean_dns(ctx: XdpContext) -> XdpResult {
         return Ok(XdpAction::Pass);
     }
 
-    // drop if id is 0
-    if unsafe { (*ip).id } == 0 {
-        return Ok(XdpAction::Drop);
-    }
-    // drop if flag is 0x40(Don't fragment)
-    if unsafe { (*ip).frag_off } == 0x0040 {
-        return Ok(XdpAction::Drop);
-    }
-
     // get first 10 byte udp data(7,8 is Answer RRs, 8,9 is Authority RRs)
     let udp_data = ctx.data()?;
     let data = udp_data.slice(10)?;
-    // pass if the dns packet has multiple answers
-    if data[6] != 0 || data[7] != 1 {
-        // Answer RR != 1
-        return Ok(XdpAction::Pass);
+
+    // drop if id is 0
+    if unsafe { (*ip).id } == 0 &&
+        data[4] == 0x00 &&
+        data[5] == 0x01 &&
+        data[6] == 0x00 &&
+        data[7] == 0x01 &&
+        data[8] == 0x00 &&
+        data[2] == 0x84 &&
+        data[3] == 0x00
+    {
+        return Ok(XdpAction::Drop);
     }
-    // pass if the dns packet has authority answer
-    if data[8] != 0 || data[9] != 0 {
-        // Authority RR != 0
-        return Ok(XdpAction::Pass);
-    }
-    // drop if dns flag has Authoritative mark
-    if (data[2] & 0b0000_0100) != 0 {
+    // drop if flag is 0x40(Don't fragment)
+    if unsafe { (*ip).frag_off } == 0x0040 &&
+        data[4] == 0x00 &&
+        data[5] == 0x01 &&
+        data[6] == 0x00 &&
+        data[7] == 0x01 &&
+        data[8] == 0x00 &&
+        data[2] == 0x81 &&
+        data[3] == 0x80
+    {
         return Ok(XdpAction::Drop);
     }
 
