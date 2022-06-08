@@ -19,7 +19,7 @@ fn clean_dns(ctx: XdpContext) -> XdpResult {
 
     // get first 10 byte udp data(7,8 is Answer RRs, 8,9 is Authority RRs)
     let udp_data = ctx.data()?;
-    let data = udp_data.slice(10)?;
+    let data = udp_data.slice(12)?;
 
     // drop if id is 0
     if unsafe { (*ip).id } == 0 &&
@@ -41,6 +41,20 @@ fn clean_dns(ctx: XdpContext) -> XdpResult {
         data[7] == 0x01 &&
         data[8] == 0x00 &&
         data[2] == 0x81 &&
+        data[3] == 0x80
+    {
+        return Ok(XdpAction::Drop);
+    }
+    // drop ex.
+    if data[4] == 0x00 &&
+        data[5] == 0x01 &&
+        data[6] == 0x00 &&
+        data[7] == 0x01 &&
+        data[8] == 0x00 &&
+        data[9] == 0x00 &&
+        data[10] == 0x00 &&
+        data[11] == 0x00 &&
+        data[2] == 0x85 &&
         data[3] == 0x80
     {
         return Ok(XdpAction::Drop);
