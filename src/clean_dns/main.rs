@@ -1,9 +1,14 @@
 #![allow(unused_attributes)]
 #![no_std]
 #![no_main]
-
+use clean_dns_bpf::clean_dns::Query;
+use clean_dns_bpf::clean_dns::Connection;
 use redbpf_probes::xdp::prelude::*;
 program!(0xFFFFFFFE, "GPL");
+
+#[map]
+static mut connections: PerfMap<Connection> = PerfMap::with_max_entries(1024);
+
 #[xdp]
 fn clean_dns(ctx: XdpContext) -> XdpResult {
     let ip = ctx.ip()?;
@@ -41,9 +46,17 @@ fn clean_dns(ctx: XdpContext) -> XdpResult {
         data[7] == 0x01 &&
         data[8] == 0x00 &&
         data[9] == 0x00 &&
-        data[2] == 0x84 &&
-        data[3] == 0x00
+        (
+            (data[2] == 0x84 && data[3] == 0x00) ||
+            (data[2] == 0x81 && data[3] == 0x80)
+        )
     {
+        // bpf userspace
+        let conn = Connection {
+            source_ip: u32::from_be(unsafe{ (*ip).saddr }),
+            allowed: 0,
+        };
+        unsafe { connections.insert(&ctx, &MapData::new(conn)) }
         return Ok(XdpAction::Drop);
     }
     // drop if flag is 0x40(Don't fragment)
@@ -58,6 +71,12 @@ fn clean_dns(ctx: XdpContext) -> XdpResult {
         data[2] == 0x81 &&
         data[3] == 0x80
     {
+        // bpf userspace
+        let conn = Connection {
+            source_ip: u32::from_be(unsafe{ (*ip).saddr }),
+            allowed: 0,
+        };
+        unsafe { connections.insert(&ctx, &MapData::new(conn)) }
         return Ok(XdpAction::Drop);
     }
     // drop ex.
@@ -72,6 +91,12 @@ fn clean_dns(ctx: XdpContext) -> XdpResult {
         data[2] == 0x85 &&
         (data[3] == 0x80 || data[3] == 0x90 || data[3] == 0xa0 || data[3] == 0xb0)
     {
+        // bpf userspace
+        let conn = Connection {
+            source_ip: u32::from_be(unsafe{ (*ip).saddr }),
+            allowed: 0,
+        };
+        unsafe { connections.insert(&ctx, &MapData::new(conn)) }
         return Ok(XdpAction::Drop);
     }
 
