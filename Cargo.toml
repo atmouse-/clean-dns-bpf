@@ -7,11 +7,13 @@ version = "0.1.0"
 
 [dependencies]
 cty = "0.2"
-redbpf-macros = "2.3"
-redbpf-probes = "2.3"
+redbpf-macros = { path = "../redbpf/redbpf-macros" }
+redbpf-probes = { path = "../redbpf/redbpf-probes" }
 
 [build-dependencies]
-cargo-bpf = {version = "2.3", default-features = false}
+cargo-bpf = { path = "../redbpf/cargo-bpf" , default-features = false, features = ["bindings"] }
+bpf-sys = { path = "../redbpf/bpf-sys" }
+
 
 [features]
 default = []

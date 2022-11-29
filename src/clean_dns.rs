@@ -41,8 +41,10 @@ fn clean_dns(ctx: XdpContext) -> XdpResult {
         data[7] == 0x01 &&
         data[8] == 0x00 &&
         data[9] == 0x00 &&
-        data[2] == 0x84 &&
-        data[3] == 0x00
+        (
+            (data[2] == 0x84 && data[3] == 0x00) ||
+            (data[2] == 0x81 && data[3] == 0x80)
+        )
     {
         return Ok(XdpAction::Drop);
     }
